@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Draw Prompt</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+      }
+      section {
+        display: flex;
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        flex-flow: column wrap;
+      }
+      .editor {
+        margin: auto;
+        width: 512px;
+        height: 512px;
+        display: flex;
+        flex-flow: row wrap;
+        border: 3px dashed #808080;
+      }
+      .colors div {
+        width: 3rem;
+        height: 3rem;
+        margin: 0.5rem;
+        display: inline-block;
+        border: 3px solid #ffffff;
+      }
+      .colors div:hover {
+        border: 3px solid #808080;
+        cursor: pointer;
+      }
+      .pixel {
+        width: calc(512px / 8);
+        height: calc(512px / 8);
+        user-select: none;
+      }
+      .pixel:hover {
+        background-color: #0000001a;
+      }
+      .red {
+        background-color: #a0293d;
+      }
+      .blue {
+        background-color: #296aa0;
+      }
+      .selectedColor {
+        border: 3px solid #000000 !important;
+        border-radius: 0.125rem;
+      }
+      .submit button {
+        margin: 1rem;
+        padding: 0.5rem 1rem;
+        font-size: 1.5rem;
+        background-color: #296aa0;
+        border: 3px solid #a0293d;
+        border-radius: 0.25rem;
+        color: white;
+        text-transform: uppercase;
+      }
+      .submit button:hover {
+        background-color: #a0293d;
+        cursor: pointer;
+      }
+      .submit button:active {
+        transform: scale(0.95);
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>Draw Some Pixel Art</h1>
+      <div class="colors">
+        <div class="red"></div>
+        <div class="blue"></div>
+      </div>
+      <div class="editor">
+        <!-- Pixels get inserted here -->
+      </div>
+      <div class="submit">
+        <button>Done!</button>
+      </div>
+    </section>
+    <script>
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => document.querySelectorAll(selector);
+
+      const state = {
+        selectedColor: 'red',
+      };
+
+      const colors = $$('.colors div');
+      const editor = $('.editor');
+
+      for (let i = 0; i < 64; i++) {
+        const pixel = document.createElement('div');
+        pixel.classList.add('pixel');
+        editor.appendChild(pixel);
+      }
+
+      function selectColor(e) {
+        colors.forEach((c) => c.classList.remove('selectedColor'));
+        (e.target || e).classList.add('selectedColor');
+        console.log('e: ', e);
+        state.selectedColor = rgbToHex(
+          window.getComputedStyle(e.target || e, null).getPropertyValue('background-color'),
+        );
+        if (['#000000', 'rgb(0,0,0)', '#181a1b'].includes(state.selectedColor)) {
+          state.selectedColor = '#a0293d';
+        }
+      }
+
+      $$('.colors > div').forEach((color) => color.addEventListener('click', selectColor));
+      $$('.pixel').forEach((pixel) =>
+        pixel.addEventListener('click', () => {
+          pixel.style.backgroundColor = state.selectedColor;
+        }),
+      );
+      $$('.pixel').forEach((pixel) =>
+        pixel.addEventListener('mouseover', (e) => {
+          if (e.buttons === 1) {
+            pixel.style.backgroundColor = state.selectedColor;
+          }
+        }),
+      );
+      $$('.pixel').forEach((pixel) =>
+        pixel.addEventListener('mousedown', (e) => {
+          pixel.style.backgroundColor = state.selectedColor;
+        }),
+      );
+
+      function readEditor() {
+        const pixels = $$('.pixel');
+        const data = [];
+        pixels.forEach((pixel) => {
+          data.push(
+            rgbToHex(window.getComputedStyle(pixel, null).getPropertyValue('background-color')),
+          );
+        });
+        return data;
+      }
+      $('.submit button').addEventListener('click', (e) => {
+        e.preventDefault();
+        const data = readEditor();
+        console.log('data: ', data);
+        const params = new URLSearchParams(window.location.search);
+        const payload = JSON.stringify({ colors: data, promptId: params.get('q') });
+        fetch('/draw', {
+          method: 'POST',
+          body: payload,
+        }).then((res) => {
+          console.log('res: ', res);
+          if (res.ok) {
+            window.open(
+              `discord:https://discord.com/channels/${params.get('t').replace(/-/g, '/')}`,
+            );
+            window.close();
+          }
+        });
+      });
+
+      // Select initial color
+      selectColor($('.colors div'));
+
+      function rgbToHex(rgb) {
+        const [_, r, g, b] = rgb.match(
+          /^rgba?[\s+]?\([\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?/i,
+        );
+        const componentToHex = (c) => {
+          const hex = Number(c).toString(16);
+          return hex.length == 1 ? '0' + hex : hex;
+        };
+        return '#' + componentToHex(r) + componentToHex(g) + componentToHex(b);
+      }
+    </script>
+  </body>
+</html>
